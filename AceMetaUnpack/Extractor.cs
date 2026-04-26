@@ -1,4 +1,6 @@
-﻿namespace AceMetaUnpack;
+﻿using System.Runtime.InteropServices;
+
+namespace AceMetaUnpack;
 
 public sealed class Extractor
 {
@@ -12,7 +14,7 @@ public sealed class Extractor
 
 	public void Process()
 	{
-		ExtractDataPattern();
+		ExtractData();
 	}
 
 	public byte[] GetValidData()
@@ -22,64 +24,61 @@ public sealed class Extractor
 		return copy;
 	}
 
-	private void ExtractDataPattern()
+	private void ExtractData()
 	{
-		byte[] dllData;
+		if (!File.Exists(_dllPath))
+			throw new FileNotFoundException("DLL not found", _dllPath);
+
+		IntPtr module = LoadLibraryEx(_dllPath, IntPtr.Zero, LOAD_LIBRARY_AS_DATAFILE);
+		if (module == IntPtr.Zero)
+			throw new Exception($"LoadLibraryEx failed. Win32Error={Marshal.GetLastWin32Error()}");
+
 		try
 		{
-			dllData = File.ReadAllBytes(_dllPath);
+			IntPtr resInfo = FindResource(module, MAKEINTRESOURCE(130), "CFG");
+			if (resInfo == IntPtr.Zero)
+				throw new Exception("CFG resource with ID 130 not found");
+
+			uint size = SizeofResource(module, resInfo);
+			if (size == 0)
+				throw new Exception($"CFG resource ID 130 has zero size. Win32Error={Marshal.GetLastWin32Error()}");
+
+			IntPtr resData = LoadResource(module, resInfo);
+			if (resData == IntPtr.Zero)
+				throw new Exception($"LoadResource failed. Win32Error={Marshal.GetLastWin32Error()}");
+
+			IntPtr ptr = LockResource(resData);
+			if (ptr == IntPtr.Zero)
+				throw new Exception("LockResource failed");
+
+			_validData = new byte[size];
+			Marshal.Copy(ptr, _validData, 0, checked((int)size));
 		}
-		catch (Exception ex)
+		finally
 		{
-			throw new Exception($"File not found: {ex.Message}");
+			FreeLibrary(module);
 		}
-
-		byte[] headPattern = new byte[]
-		{
-			(byte)'C', 0,
-			(byte)'F', 0,
-			(byte)'G', 0,
-			0, 0, 0, 0
-		};
-		byte[] tailPattern = new byte[] { 0, 0, 0, 0 };
-
-		int headPos = IndexOfSequence(dllData, headPattern, 0);
-		if (headPos < 0)
-			throw new Exception("Head pattern not found");
-
-		int startPos = headPos + headPattern.Length;
-
-		int tailPos = IndexOfSequence(dllData, tailPattern, startPos);
-		if (tailPos < 0)
-			throw new Exception("Tail pattern not found");
-
-		int len = tailPos - startPos;
-		if (len < 0)
-			throw new Exception("Tail pattern found before start position (corrupt file?)");
-
-		_validData = new byte[len];
-		Buffer.BlockCopy(dllData, startPos, _validData, 0, len);
 	}
 
-	private static int IndexOfSequence(byte[] haystack, byte[] needle, int startIndex)
-	{
-		if (needle.Length == 0) return startIndex;
-		if (haystack.Length < needle.Length) return -1;
+	private const uint LOAD_LIBRARY_AS_DATAFILE = 0x00000002;
 
-		int lastStart = haystack.Length - needle.Length;
-		for (int i = Math.Max(0, startIndex); i <= lastStart; i++)
-		{
-			bool match = true;
-			for (int j = 0; j < needle.Length; j++)
-			{
-				if (haystack[i + j] != needle[j])
-				{
-					match = false;
-					break;
-				}
-			}
-			if (match) return i;
-		}
-		return -1;
-	}
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
+
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern IntPtr FindResource(IntPtr hModule, IntPtr lpName, string lpType);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern uint SizeofResource(IntPtr hModule, IntPtr hResInfo);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern IntPtr LoadResource(IntPtr hModule, IntPtr hResInfo);
+
+	[DllImport("kernel32.dll", SetLastError = false)]
+	private static extern IntPtr LockResource(IntPtr hResData);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern bool FreeLibrary(IntPtr hModule);
+
+	private static IntPtr MAKEINTRESOURCE(int id) => (IntPtr)id;
 }
