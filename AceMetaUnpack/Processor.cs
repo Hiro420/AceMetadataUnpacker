@@ -72,7 +72,7 @@ internal sealed class Processor
 		if (Encoding.UTF8.GetString(stringsBytes).Contains("<Module>"))
 			return;
 
-		Console.WriteLine("[INFO] Decrypting metadata strings with Blowfish...");
+		Console.WriteLine("Decrypting metadata strings with Blowfish...");
 
 		byte[] key =
 		[
