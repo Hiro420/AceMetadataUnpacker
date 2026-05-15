@@ -11,7 +11,7 @@ The tool targets games where the global-metadata is embedded inside the GameAsse
 
 ## Notes
 - The tool does it's best attempt at detecting if stringliterals are encrypted. If they are, it tries to decrypt them using the standard ACE xor.
-- In certain games other parts of the metadata are encrypted. So far i've seen it only happening with `Reverse: 1999`, where strings are encrypted via blowfish. The code for it exists in the repo, you might want to uncomment it's usage.
+- In certain games other parts of the metadata are encrypted. So far i've seen it only happening with `Reverse: 1999`, where strings are encrypted via blowfish. The code will try it's best attemp to decrypt them, but perfect results are not guaranteed.
 - Special thanks to [LukeFZ](https://github.com/LukeFZ) for helping me with the blowfish part.
 
 Copyright© Hiro420
