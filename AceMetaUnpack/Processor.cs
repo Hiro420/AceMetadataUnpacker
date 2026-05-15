@@ -66,17 +66,25 @@ internal sealed class Processor
 			throw new InvalidOperationException(
 				$"Encrypted metadata string range is out of bounds. offset=0x{offset:X}, size=0x{size:X}, buffer=0x{_metaData.Length:X}");
 
+		// check if "<Module>" exists as a string in the strings section, as it's a very common string in Unity metadata and is likely to be present if the strings are not encrypted
+		byte[] stringsBytes = new byte[size];
+		Buffer.BlockCopy(_metaData, (int)offset, stringsBytes, 0, (int)size);
+		if (Encoding.UTF8.GetString(stringsBytes).Contains("<Module>"))
+			return;
+
+		Console.WriteLine("[INFO] Decrypting metadata strings with Blowfish...");
+
 		byte[] key =
 		{
-		_metaData[StringOffset + 0],
-		_metaData[StringOffset + 1],
-		_metaData[StringOffset + 2],
-		_metaData[StringOffset + 3],
-		_metaData[StringOffset + 4],
-		_metaData[StringOffset + 5],
-		_metaData[StringOffset + 6],
-		_metaData[StringOffset + 7],
-	};
+			_metaData[StringOffset + 0],
+			_metaData[StringOffset + 1],
+			_metaData[StringOffset + 2],
+			_metaData[StringOffset + 3],
+			_metaData[StringOffset + 4],
+			_metaData[StringOffset + 5],
+			_metaData[StringOffset + 6],
+			_metaData[StringOffset + 7],
+		};
 
 		var blowfish = new Blowfish(key);
 

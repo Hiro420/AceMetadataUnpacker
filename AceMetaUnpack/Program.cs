@@ -121,7 +121,7 @@ internal static class Program
 				processor.Initialize();
 				processor.EnsureStringLiteralsPatchedIfNeeded();
 				// Relevant only on Reverse: 1999. Kept here for completeness
-				//processor.DecryptMetadataStrings();
+				processor.DecryptMetadataStrings();
 			}
 			catch (Exception ex)
 			{
