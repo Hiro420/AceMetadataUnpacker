@@ -620,7 +620,7 @@ public class PEHeader
 
 	public static List<ResourceEntry> ListResources(BinaryReader reader, ref DosHeader dosHeader)
 	{
-		var result = new List<ResourceEntry>();
+		List<ResourceEntry> result = [];
 
 		if (dosHeader.dataDirectory == null || dosHeader.dataDirectory.Length < 3)
 			return result;
@@ -689,11 +689,13 @@ public class PEHeader
 		ushort idEntries = Read16LE(reader);
 		int totalEntries = namedEntries + idEntries;
 
-		var rawEntries = new (uint nameOrId, uint dataOrSubDir)[totalEntries];
+		(uint nameOrId, uint dataOrSubDir)[] rawEntries =
+			new (uint nameOrId, uint dataOrSubDir)[totalEntries];
+
 		for (int i = 0; i < totalEntries; i++)
 			rawEntries[i] = (Read32LE(reader), Read32LE(reader));
 
-		foreach (var (nameOrId, dataOrSubDir) in rawEntries)
+		foreach ((uint nameOrId, uint dataOrSubDir) in rawEntries)
 		{
 			bool isNameEntry = (nameOrId & 0x80000000) != 0;
 
@@ -744,17 +746,21 @@ public class PEHeader
 	{
 		reader.BaseStream.Seek(dirFileOffset, SeekOrigin.Begin);
 		reader.ReadBytes(12);
+
 		ushort namedEntries = Read16LE(reader);
 		ushort idEntries = Read16LE(reader);
 		int totalEntries = namedEntries + idEntries;
 
-		var rawEntries = new (uint nameOrId, uint dataOrSubDir)[totalEntries];
+		(uint nameOrId, uint dataOrSubDir)[] rawEntries =
+			new (uint nameOrId, uint dataOrSubDir)[totalEntries];
+
 		for (int i = 0; i < totalEntries; i++)
 			rawEntries[i] = (Read32LE(reader), Read32LE(reader));
 
-		foreach (var (nameOrId, dataOrSubDir) in rawEntries)
+		foreach ((uint nameOrId, uint dataOrSubDir) in rawEntries)
 		{
 			bool isNameEntry = (nameOrId & 0x80000000) != 0;
+
 			ResourceId currentId = isNameEntry
 				? new ResourceId(ReadResourceString(reader, resSectionBase + (nameOrId & 0x7FFFFFFF)))
 				: new ResourceId((ushort)nameOrId);
@@ -764,18 +770,29 @@ public class PEHeader
 			if (isSubDir)
 			{
 				long subDirOffset = resSectionBase + (dataOrSubDir & 0x7FFFFFFF);
+
 				ResourceId? nextType = level == 0 ? currentId : typeId;
 				ResourceId? nextName = level == 1 ? currentId : nameId;
-				EnumerateResourceDirectory(reader, resSectionBase, subDirOffset, level + 1,
-					nextType, nextName, result);
+
+				EnumerateResourceDirectory(
+					reader,
+					resSectionBase,
+					subDirOffset,
+					level + 1,
+					nextType,
+					nextName,
+					result);
 			}
 			else if (level == 2)
 			{
 				long dataEntryOffset = resSectionBase + dataOrSubDir;
 				long savedPos = reader.BaseStream.Position;
+
 				reader.BaseStream.Seek(dataEntryOffset, SeekOrigin.Begin);
+
 				uint dataRVA = Read32LE(reader);
 				uint dataSize = Read32LE(reader);
+
 				reader.BaseStream.Seek(savedPos, SeekOrigin.Begin);
 
 				result.Add(new ResourceEntry

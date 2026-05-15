@@ -8,7 +8,7 @@ public static class Xxtea
 	{
 		if (key.Length == 16) return (byte[])key.Clone();
 
-		var fixedKey = new byte[16];
+		byte[] fixedKey = new byte[16];
 		int copy = Math.Min(16, key.Length);
 		Buffer.BlockCopy(key, 0, fixedKey, 0, copy);
 		return fixedKey;
@@ -20,7 +20,7 @@ public static class Xxtea
 		int n = ((length & 3) == 0) ? (length >> 2) : ((length >> 2) + 1);
 		int endLen = includeLength ? (n + 1) : n;
 
-		var result = new uint[endLen];
+		uint[] result = new uint[endLen];
 
 		if (includeLength)
 			result[n] = (uint)length;
@@ -51,7 +51,7 @@ public static class Xxtea
 			n = m;
 		}
 
-		var result = new byte[n];
+		byte[] result = new byte[n];
 		for (int i = 0; i < n; i++)
 		{
 			result[i] = (byte)((data[i >> 2] >> ((i & 3) << 3)) & 0xFF);
@@ -119,7 +119,7 @@ public static class Xxtea
 
 		DecryptUInt32(v, k);
 
-		var bytes = ToByteArray(v, includeLength: false);
+		byte[]? bytes = ToByteArray(v, includeLength: false);
 		return bytes ?? throw new Exception("Invalid XXTEA data or key.");
 	}
 }

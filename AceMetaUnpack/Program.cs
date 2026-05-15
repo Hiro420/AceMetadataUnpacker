@@ -11,11 +11,11 @@ internal static class Program
 
 		public static Args Parse(string[] argv)
 		{
-			var args = new Args();
+			Args args = new();
 
 			for (int i = 0; i < argv.Length; i++)
 			{
-				var a = argv[i];
+				string a = argv[i];
 
 				if (a is "--help" or "-h" or "/?")
 				{
@@ -68,7 +68,7 @@ internal static class Program
 	{
 		try
 		{
-			var args = Args.Parse(argv);
+			Args args = Args.Parse(argv);
 
 			Console.WriteLine("Starting...");
 			Console.WriteLine($"Input : {args.Input}");
@@ -79,7 +79,7 @@ internal static class Program
 			try
 			{
 				Console.WriteLine("Extracting encrypted data...");
-				var extractor = new Extractor(args.Input);
+				Extractor extractor = new(args.Input);
 				extractor.Process();
 				encrypted = extractor.GetValidData();
 				Console.WriteLine($"Encrypted data length: {encrypted.Length} bytes");
@@ -92,7 +92,7 @@ internal static class Program
 			}
 
 			byte[] decrypted;
-			var sw = Stopwatch.StartNew();
+			Stopwatch sw = Stopwatch.StartNew();
 			try
 			{
 				Console.WriteLine("Decrypting...");
@@ -115,12 +115,12 @@ internal static class Program
 
 			try
 			{
-				var processor = new Processor(decrypted);
+				Processor processor = new(decrypted);
 
 				// ACE momento...
 				processor.Initialize();
 				processor.EnsureStringLiteralsPatchedIfNeeded();
-				// Relevant only on Reverse: 1999. Kept here for completeness
+				// Relevant only on Reverse: 1999
 				processor.DecryptMetadataStrings();
 			}
 			catch (Exception ex)

@@ -86,7 +86,7 @@ internal sealed class Processor
 			_metaData[StringOffset + 7],
 		];
 
-		var blowfish = new Blowfish(key);
+		Blowfish blowfish = new(key);
 
 		int blockCount = checked((int)(size / 8));
 		int baseOffset = checked((int)offset);
@@ -111,7 +111,7 @@ internal sealed class Processor
 
 		for (uint i = 0; i < (uint)_stringLiterals.Length; i++)
 		{
-			var lit = _stringLiterals[i];
+			Il2CppStringLiteral lit = _stringLiterals[i];
 			if (lit.Length == 0)
 				continue;
 
@@ -134,7 +134,7 @@ internal sealed class Processor
 
 		ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, (uint)_stringLiterals.Length);
 
-		var lit = _stringLiterals[index];
+		Il2CppStringLiteral lit = _stringLiterals[index];
 
 		if (lit.Length == 0)
 			return string.Empty;
@@ -142,7 +142,7 @@ internal sealed class Processor
 		if (!TryGetLiteralRange(lit, out int pos, out int len, out string? reason))
 			throw new InvalidOperationException($"String literal {index} is invalid: {reason}");
 
-		var bytes = new byte[len];
+		byte[] bytes = new byte[len];
 		Buffer.BlockCopy(_metaData, pos, bytes, 0, len);
 
 		if (!_stringLiteralsPatched)
@@ -216,7 +216,7 @@ internal sealed class Processor
 		}
 
 		int count = checked((int)(header.StringLiteralSize / StringLiteralEntrySizeBytes));
-		var result = new Il2CppStringLiteral[count];
+		Il2CppStringLiteral[] result = new Il2CppStringLiteral[count];
 
 		int baseOffset = checked((int)header.StringLiteralOffset);
 		for (int i = 0; i < count; i++)
@@ -263,7 +263,7 @@ internal sealed class Processor
 		uint mid = total / 2;
 		for (uint i = 0; i < 16 && mid + i < total; i++)
 		{
-			var lit = _stringLiterals[mid + i];
+			Il2CppStringLiteral lit = _stringLiterals[mid + i];
 			if (LiteralIsHeuristicSafe(lit) && LooksLikeUnity(TryGetLiteralAsIfUnpatched(mid + i, encoding)))
 				return true;
 		}
@@ -283,14 +283,14 @@ internal sealed class Processor
 		if (index >= (uint)_stringLiterals.Length)
 			return string.Empty;
 
-		var lit = _stringLiterals[index];
+		Il2CppStringLiteral lit = _stringLiterals[index];
 		if (lit.Length == 0)
 			return string.Empty;
 
 		if (!TryGetLiteralRange(lit, out int pos, out int len, out _))
 			return string.Empty;
 
-		var bytes = new byte[len];
+		byte[] bytes = new byte[len];
 		Buffer.BlockCopy(_metaData, pos, bytes, 0, len);
 
 		byte xorKey = unchecked((byte)(lit.Length ^ 0x2E));
