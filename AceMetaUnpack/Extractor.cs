@@ -1,84 +1,53 @@
-﻿using System.Runtime.InteropServices;
+﻿namespace AceMetaUnpack;
 
-namespace AceMetaUnpack;
-
-public sealed class Extractor
+public sealed class Extractor(string dllPath)
 {
-	private readonly string _dllPath;
-	private byte[] _validData = Array.Empty<byte>();
+	private readonly string _dllPath = dllPath ?? throw new ArgumentNullException(nameof(dllPath));
+	private byte[] _validData = [];
 
-	public Extractor(string dllPath)
-	{
-		_dllPath = dllPath ?? throw new ArgumentNullException(nameof(dllPath));
-	}
+	public void Process() => ExtractData();
 
-	public void Process()
-	{
-		ExtractData();
-	}
-
-	public byte[] GetValidData()
-	{
-		var copy = new byte[_validData.Length];
-		Buffer.BlockCopy(_validData, 0, copy, 0, _validData.Length);
-		return copy;
-	}
+	public byte[] GetValidData() => (byte[])_validData.Clone();
 
 	private void ExtractData()
 	{
 		if (!File.Exists(_dllPath))
 			throw new FileNotFoundException("DLL not found", _dllPath);
 
-		IntPtr module = LoadLibraryEx(_dllPath, IntPtr.Zero, LOAD_LIBRARY_AS_DATAFILE);
-		if (module == IntPtr.Zero)
-			throw new Exception($"LoadLibraryEx failed. Win32Error={Marshal.GetLastWin32Error()}");
+		using FileStream fs = File.OpenRead(_dllPath);
+		using BinaryReader reader = new(fs);
 
-		try
-		{
-			IntPtr resInfo = FindResource(module, MAKEINTRESOURCE(130), "CFG");
-			if (resInfo == IntPtr.Zero)
-				throw new Exception("CFG resource with ID 130 not found");
+		PEHeader.DosHeader dosHeader = new();
 
-			uint size = SizeofResource(module, resInfo);
-			if (size == 0)
-				throw new Exception($"CFG resource ID 130 has zero size. Win32Error={Marshal.GetLastWin32Error()}");
+		PEHeader.ReadDos(reader, ref dosHeader);
+		PEHeader.ReadPe(reader, ref dosHeader);
 
-			IntPtr resData = LoadResource(module, resInfo);
-			if (resData == IntPtr.Zero)
-				throw new Exception($"LoadResource failed. Win32Error={Marshal.GetLastWin32Error()}");
+		if (dosHeader.pe.signature != 0x4550)
+			throw new InvalidDataException(
+				"Invalid PE signature. The file may be corrupt or not a valid PE file.");
 
-			IntPtr ptr = LockResource(resData);
-			if (ptr == IntPtr.Zero)
-				throw new Exception("LockResource failed");
+		PEHeader.ReadDataDir(reader, ref dosHeader);
+		PEHeader.ReadSections(reader, ref dosHeader);
+		PEHeader.ReadDataOffset(ref dosHeader);
+		PEHeader.ReadExportDir(reader, ref dosHeader);
+		PEHeader.ReadImportDir(reader, ref dosHeader);
 
-			_validData = new byte[size];
-			Marshal.Copy(ptr, _validData, 0, checked((int)size));
-		}
-		finally
-		{
-			FreeLibrary(module);
-		}
+		if (dosHeader.dataDirectory is null || dosHeader.section_table is null)
+			throw new InvalidDataException(
+				"Failed to read PE headers or sections. The file may be corrupt or not a valid PE file.");
+
+		byte[]? metadataResource = PEHeader.ExtractResource(
+			reader,
+			ref dosHeader,
+			new PEHeader.ResourceId("CFG"),
+			new PEHeader.ResourceId(130));
+
+		if (metadataResource is null || metadataResource.Length == 0)
+			throw new InvalidDataException(
+				"Failed to extract resource with ID 130 and type 'CFG'. The resource may be missing or corrupt.");
+
+		_validData = metadataResource;
+
+		PEHeader.Cleanup(ref dosHeader);
 	}
-
-	private const uint LOAD_LIBRARY_AS_DATAFILE = 0x00000002;
-
-	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-	private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
-
-	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-	private static extern IntPtr FindResource(IntPtr hModule, IntPtr lpName, string lpType);
-
-	[DllImport("kernel32.dll", SetLastError = true)]
-	private static extern uint SizeofResource(IntPtr hModule, IntPtr hResInfo);
-
-	[DllImport("kernel32.dll", SetLastError = true)]
-	private static extern IntPtr LoadResource(IntPtr hModule, IntPtr hResInfo);
-
-	[DllImport("kernel32.dll", SetLastError = false)]
-	private static extern IntPtr LockResource(IntPtr hResData);
-
-	[DllImport("kernel32.dll", SetLastError = true)]
-	private static extern bool FreeLibrary(IntPtr hModule);
-
-	private static IntPtr MAKEINTRESOURCE(int id) => (IntPtr)id;
 }

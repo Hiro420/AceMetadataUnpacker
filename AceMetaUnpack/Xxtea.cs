@@ -39,9 +39,9 @@ public static class Xxtea
 
 		if (includeLength)
 		{
-			if (data.Length == 0) return Array.Empty<byte>();
+			if (data.Length == 0) return [];
 
-			uint last = data[data.Length - 1];
+			uint last = data[^1];
 			int m = unchecked((int)last);
 			n -= 4;
 
@@ -111,7 +111,7 @@ public static class Xxtea
 
 	public static byte[] Decrypt(byte[] data, byte[] key)
 	{
-		if (data.Length == 0) return Array.Empty<byte>();
+		if (data.Length == 0) return [];
 
 		byte[] fixedKey = FixKey(key);
 		uint[] v = ToUInt32Array(data, includeLength: false);
@@ -120,9 +120,6 @@ public static class Xxtea
 		DecryptUInt32(v, k);
 
 		var bytes = ToByteArray(v, includeLength: false);
-		if (bytes == null)
-			throw new Exception("Invalid XXTEA data or key.");
-
-		return bytes;
+		return bytes ?? throw new Exception("Invalid XXTEA data or key.");
 	}
 }

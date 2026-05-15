@@ -8,7 +8,7 @@ internal sealed class Processor
 	private readonly byte[] _metaData;
 
 	private Il2CppGlobalMetadataHeader _header;
-	private Il2CppStringLiteral[] _stringLiterals = Array.Empty<Il2CppStringLiteral>();
+	private Il2CppStringLiteral[] _stringLiterals = [];
 
 	private bool _initialized;
 	private bool _stringLiteralsPatched;
@@ -75,7 +75,7 @@ internal sealed class Processor
 		Console.WriteLine("[INFO] Decrypting metadata strings with Blowfish...");
 
 		byte[] key =
-		{
+		[
 			_metaData[StringOffset + 0],
 			_metaData[StringOffset + 1],
 			_metaData[StringOffset + 2],
@@ -84,7 +84,7 @@ internal sealed class Processor
 			_metaData[StringOffset + 5],
 			_metaData[StringOffset + 6],
 			_metaData[StringOffset + 7],
-		};
+		];
 
 		var blowfish = new Blowfish(key);
 
@@ -112,7 +112,7 @@ internal sealed class Processor
 		for (uint i = 0; i < (uint)_stringLiterals.Length; i++)
 		{
 			var lit = _stringLiterals[i];
-			if (lit.length == 0)
+			if (lit.Length == 0)
 				continue;
 
 			if (!TryGetLiteralRange(lit, out int pos, out int len, out string? reason))
@@ -121,7 +121,7 @@ internal sealed class Processor
 				continue;
 			}
 
-			byte xorKey = unchecked((byte)(lit.length ^ 0x2E));
+			byte xorKey = unchecked((byte)(lit.Length ^ 0x2E));
 			for (int j = 0; j < len; j++)
 				_metaData[pos + j] ^= xorKey;
 		}
@@ -132,12 +132,11 @@ internal sealed class Processor
 		EnsureInitialized();
 		encoding ??= Encoding.UTF8;
 
-		if (index >= (uint)_stringLiterals.Length)
-			throw new ArgumentOutOfRangeException(nameof(index));
+		ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, (uint)_stringLiterals.Length);
 
 		var lit = _stringLiterals[index];
 
-		if (lit.length == 0)
+		if (lit.Length == 0)
 			return string.Empty;
 
 		if (!TryGetLiteralRange(lit, out int pos, out int len, out string? reason))
@@ -148,7 +147,7 @@ internal sealed class Processor
 
 		if (!_stringLiteralsPatched)
 		{
-			byte xorKey = unchecked((byte)(lit.length ^ 0x2E));
+			byte xorKey = unchecked((byte)(lit.Length ^ 0x2E));
 			for (int i = 0; i < len; i++)
 				bytes[i] ^= xorKey;
 		}
@@ -193,9 +192,9 @@ internal sealed class Processor
 		int stringSize = ReadInt32LE(_metaData, StringOffset2);
 
 		return new Il2CppGlobalMetadataHeader(
-			stringLiteralOffset: stringLiteralOffset,
-			stringLiteralSize: stringLiteralSize,
-			stringLiteralDataOffset: stringLiteralDataOffset,
+			StringLiteralOffset: stringLiteralOffset,
+			StringLiteralSize: stringLiteralSize,
+			StringLiteralDataOffset: stringLiteralDataOffset,
 			StringOffset: stringOffset,
 			StringSize: stringSize
 		);
@@ -203,23 +202,23 @@ internal sealed class Processor
 
 	private Il2CppStringLiteral[] ReadStringLiteralTable(Il2CppGlobalMetadataHeader header)
 	{
-		if (header.stringLiteralSize == 0)
-			return Array.Empty<Il2CppStringLiteral>();
+		if (header.StringLiteralSize == 0)
+			return [];
 
-		if (header.stringLiteralSize % StringLiteralEntrySizeBytes != 0)
+		if (header.StringLiteralSize % StringLiteralEntrySizeBytes != 0)
 			throw new InvalidOperationException(
-				$"stringLiteralSize is not a multiple of {StringLiteralEntrySizeBytes} (size={header.stringLiteralSize}).");
+				$"StringLiteralSize is not a multiple of {StringLiteralEntrySizeBytes} (size={header.StringLiteralSize}).");
 
-		if (header.stringLiteralOffset > (uint)_metaData.Length ||
-			header.stringLiteralSize > (uint)_metaData.Length - header.stringLiteralOffset)
+		if (header.StringLiteralOffset > (uint)_metaData.Length ||
+			header.StringLiteralSize > (uint)_metaData.Length - header.StringLiteralOffset)
 		{
 			throw new InvalidOperationException("String literal table is out of bounds.");
 		}
 
-		int count = checked((int)(header.stringLiteralSize / StringLiteralEntrySizeBytes));
+		int count = checked((int)(header.StringLiteralSize / StringLiteralEntrySizeBytes));
 		var result = new Il2CppStringLiteral[count];
 
-		int baseOffset = checked((int)header.stringLiteralOffset);
+		int baseOffset = checked((int)header.StringLiteralOffset);
 		for (int i = 0; i < count; i++)
 		{
 			int entryOffset = baseOffset + (i * StringLiteralEntrySizeBytes);
@@ -235,13 +234,13 @@ internal sealed class Processor
 
 	private static bool LiteralIsHeuristicSafe(Il2CppStringLiteral lit)
 	{
-		if (lit.length == 0x2E)
+		if (lit.Length == 0x2E)
 			return false;
 
-		if (lit.length < 5)
+		if (lit.Length < 5)
 			return false;
 
-		if (lit.length > 1_000_000)
+		if (lit.Length > 1_000_000)
 			return false;
 
 		return true;
@@ -279,41 +278,13 @@ internal sealed class Processor
 		return false;
 	}
 
-	private string TryGetLiteralPlainText(uint index, Encoding encoding)
-	{
-		if (index >= (uint)_stringLiterals.Length)
-			return string.Empty;
-
-		var lit = _stringLiterals[index];
-		if (lit.length == 0)
-			return string.Empty;
-
-		if (!TryGetLiteralRange(lit, out int pos, out int len, out _))
-			return string.Empty;
-
-		var bytes = new byte[len];
-		Buffer.BlockCopy(_metaData, pos, bytes, 0, len);
-
-		byte xorKey = unchecked((byte)(lit.length ^ 0x2E));
-		for (int i = 0; i < len; i++)
-			bytes[i] ^= xorKey;
-
-		int trimmedLen = TrimTrailingNullsLength(bytes);
-
-		Encoding safe = (Encoding)encoding.Clone();
-		safe.DecoderFallback = DecoderFallback.ReplacementFallback;
-		safe.EncoderFallback = EncoderFallback.ReplacementFallback;
-
-		return safe.GetString(bytes, 0, trimmedLen);
-	}
-
 	private string TryGetLiteralAsIfUnpatched(uint index, Encoding encoding)
 	{
 		if (index >= (uint)_stringLiterals.Length)
 			return string.Empty;
 
 		var lit = _stringLiterals[index];
-		if (lit.length == 0)
+		if (lit.Length == 0)
 			return string.Empty;
 
 		if (!TryGetLiteralRange(lit, out int pos, out int len, out _))
@@ -322,7 +293,7 @@ internal sealed class Processor
 		var bytes = new byte[len];
 		Buffer.BlockCopy(_metaData, pos, bytes, 0, len);
 
-		byte xorKey = unchecked((byte)(lit.length ^ 0x2E));
+		byte xorKey = unchecked((byte)(lit.Length ^ 0x2E));
 		if (xorKey != 0)
 		{
 			for (int i = 0; i < len; i++)
@@ -353,14 +324,14 @@ internal sealed class Processor
 		pos = 0;
 		len = 0;
 
-		if (lit.length > int.MaxValue)
+		if (lit.Length > int.MaxValue)
 		{
-			reason = $"length too large ({lit.length})";
+			reason = $"length too large ({lit.Length})";
 			return false;
 		}
 
-		ulong pos64 = (ulong)_header.stringLiteralDataOffset + (ulong)lit.dataIndex;
-		ulong end64 = pos64 + (ulong)lit.length;
+		ulong pos64 = (ulong)_header.StringLiteralDataOffset + (ulong)lit.DataIndex;
+		ulong end64 = pos64 + (ulong)lit.Length;
 
 		if (pos64 > (ulong)_metaData.Length)
 		{
@@ -370,12 +341,12 @@ internal sealed class Processor
 
 		if (end64 > (ulong)_metaData.Length)
 		{
-			reason = $"range out of bounds (pos={pos64}, len={lit.length}, buf={_metaData.Length})";
+			reason = $"range out of bounds (pos={pos64}, len={lit.Length}, buf={_metaData.Length})";
 			return false;
 		}
 
 		pos = (int)pos64;
-		len = (int)lit.length;
+		len = (int)lit.Length;
 		return true;
 	}
 
@@ -403,15 +374,15 @@ internal sealed class Processor
 	}
 
 	private readonly record struct Il2CppGlobalMetadataHeader(
-		int stringLiteralOffset,
-		int stringLiteralSize,
-		int stringLiteralDataOffset,
+		int StringLiteralOffset,
+		int StringLiteralSize,
+		int StringLiteralDataOffset,
 		int StringOffset,
 		int StringSize
 	);
 
 	private readonly record struct Il2CppStringLiteral(
-		uint length,
-		uint dataIndex
+		uint Length,
+		uint DataIndex
 	);
 }

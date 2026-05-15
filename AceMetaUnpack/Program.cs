@@ -23,7 +23,7 @@ internal static class Program
 					Environment.Exit(0);
 				}
 
-				if (!a.StartsWith("-", StringComparison.Ordinal))
+				if (!a.StartsWith('-'))
 				{
 					if (string.Equals(args.Input, "GameAssembly.dll", StringComparison.Ordinal) && i == 0)
 					{
@@ -48,7 +48,7 @@ internal static class Program
 			return args;
 		}
 
-		private static bool IsFlag(string s) => s.StartsWith("-", StringComparison.Ordinal) || s.StartsWith("/", StringComparison.Ordinal);
+		private static bool IsFlag(string s) => s.StartsWith('-') || s.StartsWith('/');
 
 		private static void PrintHelp()
 		{
@@ -153,5 +153,5 @@ internal static class Program
 		}
 	}
 
-	private static readonly byte[] Key = { (byte)'E', (byte)'8', (byte)'F', (byte)'F' };
+	private static readonly byte[] Key = [(byte)'E', (byte)'8', (byte)'F', (byte)'F'];
 }
