@@ -311,6 +311,9 @@ internal sealed class Processor
 
 	private static bool LooksLikeUnity(string s)
 	{
+		if (s.Length == 0x2E)
+			return false;
+
 		if (string.IsNullOrEmpty(s))
 			return false;
 
